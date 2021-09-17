@@ -1,3 +1,10 @@
+import threading
+import time
+import os
+from userdata import UserData
+from ai_tools import getAgeGender,updateData
+import statistics
+
 import cv2
 import numpy as np
 import collections
@@ -14,8 +21,73 @@ import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 s_img, s_boxes = None, None
+inuser = {}
 INPUT_HW = (300, 300)
 MAIN_THREAD_TIMEOUT = 20.0  # 20 seconds
+threadarrLock = threading.Lock()
+
+class CheckPeople(threading.Thread):  # 確認人流狀況
+    def run(self):
+        isOn = []
+        while(True):
+            isOnTmp = []
+            self.threadarrLock.acquire()
+            for userdata in inuser:
+                if inuser[userdata].checkLeave():
+                    # print(userdata+" isLeave")
+                    pass
+                else:
+                    # print(userdata+" isOn")
+                    isOnTmp.append(inuser[userdata])
+            self.threadarrLock.release()
+            try:
+                apidata = []
+                for tmp in isOnTmp:
+                    if tmp not in isOn:
+                        # 新加入人員
+                        print("新加入人員:"+str(tmp.jointime))
+                        
+                    else:
+                        # 已存在
+                        if tmp.age == 0 and len(tmp.getFileList()) >= 3:
+                            data = getAgeGender(tmp.getFileList())
+                            genderlist = []
+                            agelist = []
+                            for agegenderdata in data:
+                                for agegenderdataitem in agegenderdata:
+                                    gender, age = agegenderdataitem["value"].split(",")
+                                    genderlist.append(gender)
+                                    agelist.append(float(age))
+                            agemean = statistics.mean(agelist)
+                            gender = max(genderlist,key=genderlist.count)
+                            tmp.setGenderAge(gender,agemean)
+                        print("已存在人員:"+str(tmp.jointime))
+                        print("年齡:"+str(tmp.age))
+                        print("性別:"+str(tmp.gender))
+                        print("停留時間:"+str(tmp.ontime()))
+                        # 後台只關注停留中的人
+                        apidata.append(tmp.getDict())
+                for tmp in isOn:
+                    if tmp not in isOnTmp:
+                        # 已離開
+                        print("已離開人員:"+str(tmp.jointime))
+                        print("年齡:"+str(tmp.age))
+                        print("性別:"+str(tmp.gender))
+                        print("停留時間:"+str(tmp.ontime()))
+                isOn = isOnTmp
+                # 回傳資料至後台
+                updateData(data=apidata)
+                time.sleep(1)
+            except:
+                print("error!!!!!")
+                time.sleep(3)
+
+    def __init__(self,threadarrLock):
+        threading.Thread.__init__(self)
+        self.threadarrLock = threadarrLock
+        
+
+
 
 # SORT Multi object tracking
 
@@ -189,7 +261,7 @@ class TrtThread(threading.Thread):
         self.running = False
 
     def run(self):
-        global s_img, s_boxes
+        global s_img, s_boxes, s_row_img
 
         print('TrtThread: loading the TRT SSD engine...')
         self.cuda_ctx = cuda.Device(0).make_context()  # GPU 0
@@ -197,13 +269,13 @@ class TrtThread(threading.Thread):
         print('TrtThread: start running...')
         self.running = True
         while self.running:
-            ret, img = self.cam.read()
-            if img is None:
+            ret, imgtmp = self.cam.read()
+            if imgtmp is None:
                 break
-            img = cv2.resize(img, (300, 300))
+            img = cv2.resize(imgtmp, (300, 300))
             boxes, confs, clss = self.trt_ssd.detect(img, self.conf_th)
             with self.condition:
-                s_img, s_boxes = img, boxes
+                s_img, s_boxes, s_row_img = img, boxes, imgtmp
                 self.condition.notify()
         del self.trt_ssd
         self.cuda_ctx.pop()
@@ -221,23 +293,27 @@ def get_frame(condition):
     
     trackers = []
     
-    global s_img, s_boxes
+    global s_img, s_boxes, s_row_img, inuser
     
     print("frame number ", frame)
     frame += 1
     idstp = collections.defaultdict(list)
-    idcnt = []
-    incnt, outcnt = 0, 0
+    # idcnt = []
+    # incnt, outcnt = 0, 0
     
     while True:
         with condition:
             if condition.wait(timeout=MAIN_THREAD_TIMEOUT):
-                img, boxes = s_img, s_boxes
+                row_img,img, boxes = s_row_img,s_img, s_boxes
             else:
                 raise SystemExit('ERROR: timeout waiting for img from child')
+        row_h = s_row_img.shape[0]
+        row_w = s_row_img.shape[1]
+        img_h = s_img.shape[0]
+        img_w = s_img.shape[1]
         boxes = np.array(boxes)
 
-        H, W = img.shape[:2]
+        H, W = s_row_img.shape[:2]
 
         trks = np.zeros((len(trackers), 5))
         to_del = []
@@ -254,34 +330,24 @@ def get_frame(condition):
         matched, unmatched_dets, unmatched_trks = associate_detections_to_trackers(boxes, trks)
 
         # update matched trackers with assigned detections
+        # print("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
         for t, trk in enumerate(trackers):
+            # print("id:"+str(trk.id)+"\tage:"+str(trk.age)+"\thits:"+str(trk.hits)+"\ttime_since_update:"+str(trk.time_since_update))
             if t not in unmatched_trks:
                 d = matched[np.where(matched[:, 1] == t)[0], 0]
                 trk.update(boxes[d, :][0])
                 xmin, ymin, xmax, ymax = boxes[d, :][0]
-                cy = int((ymin + ymax) / 2)
-                
-                #IN count
-                if  idstp[trk.id][0][1] < H // 2 and cy > H // 2 and trk.id not in idcnt:
-                    incnt += 1
-                    print("id: " + str(trk.id) + " - IN ")
-                    idcnt.append(trk.id)
-
-                #OUT count
-                elif  idstp[trk.id][0][1] > H // 2 and cy < H // 2 and trk.id not in idcnt:
-                    outcnt += 1
-                    print("id: " + str(trk.id) + " - OUT ")
-                    idcnt.append(trk.id)
-
-                cv2.rectangle(img, (xmin, ymin), (xmax, ymax), (0, 0, 255), 2)
-                cv2.putText(img, "id: " + str(trk.id), (int(xmin) - 10, int(ymin) - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-
+                xmin = int(xmin * (row_w/img_w))
+                xmax = int(xmax * (row_w/img_w))
+                ymin = int(ymin * (row_h/img_h))
+                ymax = int(ymax * (row_h/img_h))
+                filepath = "userfiles/"+str(trk.id)+"/"+str(time.time())+".jpg"
+                cv2.imwrite(filepath,row_img[ymin:ymax,xmin:xmax])
+                inuser[str(trk.id)].find(filepath)
+                cv2.rectangle(row_img, (xmin, ymin), (xmax, ymax), (0, 0, 255), 2)
+                cv2.putText(row_img, "id: " + str(trk.id), (int(xmin) - 10, int(ymin) - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
         #Total, IN, OUT count & Line
-        cv2.putText(img, "Total: " + str(len(trackers)), (15, 25), cv2.FONT_HERSHEY_DUPLEX, 0.7, (255, 255, 255), 1)
-
-        cv2.line(img, (0, H // 2), (W, H // 2), (255, 0, 0), 3)
-        cv2.putText(img, "IN: " + str(incnt), (10, H // 2 - 10), cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 255, 255), 1)
-        cv2.putText(img, "OUT: " + str(outcnt), (10, H // 2 + 20), cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 255, 255), 1)
+        cv2.putText(row_img, "Total: " + str(len(trackers)), (15, 25), cv2.FONT_HERSHEY_DUPLEX, 0.7, (255, 255, 255), 1)
 
         # create and initialise new trackers for unmatched detections
         for i in unmatched_dets:
@@ -289,20 +355,30 @@ def get_frame(condition):
             trackers.append(trk)
 
             trk.id = len(trackers)
-
+            if not os.path.isdir("userfiles/"):
+                    os.mkdir("userfiles/")
+            if not os.path.isdir("userfiles/"+str(trk.id)):
+                os.mkdir("userfiles/"+str(trk.id))
+            userdata = UserData(str(trk.id))
+            threadarrLock.acquire()
+            inuser[str(trk.id)] = userdata
+            threadarrLock.release()
             #new tracker id & u, v
             u, v = trk.kf.x[0], trk.kf.x[1]
             idstp[trk.id].append([u, v])
 
             if trk.time_since_update > max_age:
                 trackers.pop(i)
-
-        cv2.imshow("dst",img)
+        
+        # cv2.imshow("dst",cv2.resize(row_img, (int(row_img.shape[1]/2), int(row_img.shape[0]/2))))
+        cv2.imwrite("tmp.jpg",row_img)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
 
 if __name__ == '__main__':
+    checkPeople = CheckPeople(threadarrLock)
+    checkPeople.start()
     model = 'ssd_mobilenet_v1_coco'
     cam = cv2.VideoCapture(0)
     
