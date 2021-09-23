@@ -43,4 +43,5 @@ class UserData():
 
     def getDict(self):
         return {"id":str(self.jointime),"age":str(int(self.age)),"sex":str(self.gender),"staytime":str(self.ontime())}
+        # return {"id":str(self.jointime),"age":str(int(self.age)),"sex":"Female","staytime":str(self.ontime())}
         

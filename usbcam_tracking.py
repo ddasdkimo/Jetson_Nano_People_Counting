@@ -4,6 +4,7 @@ import os
 from userdata import UserData
 from ai_tools import getAgeGender,updateData
 import statistics
+import shutil
 
 import cv2
 import numpy as np
@@ -74,6 +75,8 @@ class CheckPeople(threading.Thread):  # 確認人流狀況
                         print("年齡:"+str(tmp.age))
                         print("性別:"+str(tmp.gender))
                         print("停留時間:"+str(tmp.ontime()))
+                        print("刪除暫存資料！！！！！！！:"+str(tmp.ontime()))
+
                 isOn = isOnTmp
                 # 回傳資料至後台
                 updateData(data=apidata)
