@@ -75,8 +75,15 @@ class CheckPeople(threading.Thread):  # 確認人流狀況
                         print("年齡:"+str(tmp.age))
                         print("性別:"+str(tmp.gender))
                         print("停留時間:"+str(tmp.ontime()))
-                        print("刪除暫存資料！！！！！！！:"+str(tmp.ontime()))
-
+                        delpath = "userfiles/"+tmp.userid
+                        print("刪除暫存資料:"+delpath)
+                        try:
+                            shutil.rmtree(delpath)
+                        except OSError as e:
+                            print(e)
+                        else:
+                            print("done")
+                            
                 isOn = isOnTmp
                 # 回傳資料至後台
                 updateData(data=apidata)
