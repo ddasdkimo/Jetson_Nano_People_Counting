@@ -1,6 +1,9 @@
 from math import isclose
 from operator import truediv
 import time
+import os
+
+
 class UserData():
     userid = ""
     isLeave = False
@@ -23,11 +26,20 @@ class UserData():
         #被找到
         self.lasttime = time.time()
         self.findcount += 1
+    def reset(self):
+        self.jointime = time.time()
+        self.lasttime = time.time()
+        self.filelist = []
+        self.findcount = 0
 
     def checkLeave(self):
         # 檢查確認是否離開
         if time.time() - self.lasttime > 3:
             self.isLeave = True
+        if self.isLeave:
+            self.findcount = 0
+            self.jointime = time.time()
+            self.filelist = []
         return self.isLeave
 
     def ontime(self):
@@ -35,8 +47,18 @@ class UserData():
         return time.time() - self.jointime
 
     def getFileList(self):
-        return self.filelist[-3:]
-    
+        # 要檢查的檔案路徑
+        
+        filearr = []
+        # 檢查檔案是否存在
+        for filepath in self.filelist:
+            if os.path.isfile(filepath):
+                filearr.append(filepath)
+            # else:
+            #     print("檔案不存在。")
+        return filearr[-3:]
+    def getFileListcount(self):
+        return len(self.filelist)
     def setGenderAge(self,gender,age):
         self.gender = gender
         self.age = age

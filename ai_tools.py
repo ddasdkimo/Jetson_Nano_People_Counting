@@ -1,7 +1,7 @@
 import requests
 import json
 import uuid
-SERVERIP = "http://192.168.50.100"
+SERVERIP = "https://fit.raibaseserver.intemotech.com/"
 def GetMAC():
     r""" 針對單網卡 """
     addr = hex(uuid.getnode())[2:].upper()
@@ -9,17 +9,17 @@ def GetMAC():
 
 def updateData(data):
     # 上傳人員狀態至伺服器
-    url = SERVERIP + ":8001/ai/aidata"
+    url = SERVERIP + "ai/aidata"
     payload={'uid':GetMAC(),
     'data': json.dumps(data)}
     headers = {}
     response = requests.request("POST", url, headers=headers, data=payload)
 
-    print(response.text)
+    # print(response.text)
 
 
 def getAgeGender(filelist):
-    url = SERVERIP + ":5000/detects"
+    url = "https://fkagegender.intemotech.com/detects"
     payload = {'token': 'xcreensupermarket'}
     files = []
     count = 0

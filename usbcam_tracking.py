@@ -21,6 +21,9 @@ import warnings
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
+
+
+
 s_img, s_boxes = None, None
 inuser = {}
 INPUT_HW = (300, 300)
@@ -47,10 +50,12 @@ class CheckPeople(threading.Thread):  # 確認人流狀況
                     if tmp not in isOn:
                         # 新加入人員
                         print("新加入人員:"+str(tmp.jointime))
-                        
+                        tmp.reset()
+                        print("停留時間:"+str(tmp.ontime()))
                     else:
                         # 已存在
-                        if tmp.age == 0 and len(tmp.getFileList()) >= 3:
+                        # if tmp.age == 0 and len(tmp.getFileList()) >= 3:
+                        if len(tmp.getFileList()) >= 3 and (tmp.getFileListcount()<30 or tmp.age == 0):
                             data = getAgeGender(tmp.getFileList())
                             genderlist = []
                             agelist = []
@@ -62,21 +67,22 @@ class CheckPeople(threading.Thread):  # 確認人流狀況
                             agemean = statistics.mean(agelist)
                             gender = max(genderlist,key=genderlist.count)
                             tmp.setGenderAge(gender,agemean)
-                        print("已存在人員:"+str(tmp.jointime))
-                        print("年齡:"+str(tmp.age))
-                        print("性別:"+str(tmp.gender))
+                        # print("已存在人員:"+str(tmp.jointime))
+                        # print("年齡:"+str(tmp.age))
+                        # print("性別:"+str(tmp.gender))
+                        print("ID:"+str(tmp.userid))
                         print("停留時間:"+str(tmp.ontime()))
                         # 後台只關注停留中的人
                         apidata.append(tmp.getDict())
                 for tmp in isOn:
                     if tmp not in isOnTmp:
                         # 已離開
-                        print("已離開人員:"+str(tmp.jointime))
-                        print("年齡:"+str(tmp.age))
-                        print("性別:"+str(tmp.gender))
-                        print("停留時間:"+str(tmp.ontime()))
+                        # print("已離開人員:"+str(tmp.jointime))
+                        # print("年齡:"+str(tmp.age))
+                        # print("性別:"+str(tmp.gender))
+                        # print("停留時間:"+str(tmp.ontime()))
+                        # print("刪除暫存資料:"+delpath)
                         delpath = "userfiles/"+tmp.userid
-                        print("刪除暫存資料:"+delpath)
                         try:
                             shutil.rmtree(delpath)
                         except OSError as e:
@@ -88,7 +94,7 @@ class CheckPeople(threading.Thread):  # 確認人流狀況
                 # 回傳資料至後台
                 updateData(data=apidata)
                 time.sleep(1)
-            except:
+            except Exception as e: 
                 print("error!!!!!")
                 time.sleep(3)
 
@@ -280,6 +286,7 @@ class TrtThread(threading.Thread):
         self.running = True
         while self.running:
             ret, imgtmp = self.cam.read()
+            # imgtmp = cv2.imread("test.png")
             if imgtmp is None:
                 break
             img = cv2.resize(imgtmp, (300, 300))
@@ -315,8 +322,8 @@ def get_frame(condition):
         with condition:
             if condition.wait(timeout=MAIN_THREAD_TIMEOUT):
                 row_img,img, boxes = s_row_img,s_img, s_boxes
-            else:
-                raise SystemExit('ERROR: timeout waiting for img from child')
+            # else:
+            #     raise SystemExit('ERROR: timeout waiting for img from child')
         row_h = s_row_img.shape[0]
         row_w = s_row_img.shape[1]
         img_h = s_img.shape[0]
@@ -355,7 +362,12 @@ def get_frame(condition):
                 cv2.imwrite(filepath,row_img[ymin:ymax,xmin:xmax])
                 inuser[str(trk.id)].find(filepath)
                 cv2.rectangle(row_img, (xmin, ymin), (xmax, ymax), (0, 0, 255), 2)
-                cv2.putText(row_img, "id: " + str(trk.id), (int(xmin) - 10, int(ymin) - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                if str(trk.id) in inuser:
+                    cv2.putText(row_img, "id: " + str(trk.id), (int(xmin) + 10, int(ymin) + 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                    cv2.putText(row_img, "gender:"+inuser[str(trk.id)].gender, (int(xmin) + 10, int(ymin) + 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                    cv2.putText(row_img, "age:"+str(int(inuser[str(trk.id)].age)), (int(xmin) + 10, int(ymin) + 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                else:
+                    cv2.putText(row_img, "id: " + str(trk.id), (int(xmin) - 10, int(ymin) - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
         #Total, IN, OUT count & Line
         cv2.putText(row_img, "Total: " + str(len(trackers)), (15, 25), cv2.FONT_HERSHEY_DUPLEX, 0.7, (255, 255, 255), 1)
 
@@ -381,7 +393,8 @@ def get_frame(condition):
                 trackers.pop(i)
         
         # cv2.imshow("dst",cv2.resize(row_img, (int(row_img.shape[1]/2), int(row_img.shape[0]/2))))
-        cv2.imwrite("tmp.jpg",row_img)
+        # cv2.imwrite("./shm/"+str(time.time)+"tmp.jpg",row_img)
+        cv2.imwrite("./shm/tmp.jpg",row_img)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
