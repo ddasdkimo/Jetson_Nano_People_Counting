@@ -55,18 +55,20 @@ class CheckPeople(threading.Thread):  # 確認人流狀況
                     else:
                         # 已存在
                         # if tmp.age == 0 and len(tmp.getFileList()) >= 3:
-                        if len(tmp.getFileList()) >= 3 and (tmp.getFileListcount()<30 or tmp.age == 0):
-                            data = getAgeGender(tmp.getFileList())
-                            genderlist = []
-                            agelist = []
-                            for agegenderdata in data:
-                                for agegenderdataitem in agegenderdata:
-                                    gender, age = agegenderdataitem["value"].split(",")
-                                    genderlist.append(gender)
-                                    agelist.append(float(age))
-                            agemean = statistics.mean(agelist)
-                            gender = max(genderlist,key=genderlist.count)
-                            tmp.setGenderAge(gender,agemean)
+                        
+                        # if len(tmp.getFileList()) >= 2 and (tmp.getFileListcount()<5 or tmp.age == 0):
+                        #     data = getAgeGender(tmp.getFileList())
+                        #     genderlist = []
+                        #     agelist = []
+                        #     for agegenderdata in data:
+                        #         for agegenderdataitem in agegenderdata:
+                        #             gender, age = agegenderdataitem["value"].split(",")
+                        #             genderlist.append(gender)
+                        #             agelist.append(float(age))
+                        #     agemean = statistics.mean(agelist)
+                        #     gender = max(genderlist,key=genderlist.count)
+                        #     tmp.setGenderAge(gender,agemean)
+
                         # print("已存在人員:"+str(tmp.jointime))
                         # print("年齡:"+str(tmp.age))
                         # print("性別:"+str(tmp.gender))
@@ -329,7 +331,6 @@ def get_frame(condition):
         img_h = s_img.shape[0]
         img_w = s_img.shape[1]
         boxes = np.array(boxes)
-
         H, W = s_row_img.shape[:2]
 
         trks = np.zeros((len(trackers), 5))
@@ -345,7 +346,7 @@ def get_frame(condition):
             trackers.pop(t)
         
         matched, unmatched_dets, unmatched_trks = associate_detections_to_trackers(boxes, trks)
-
+        
         # update matched trackers with assigned detections
         # print("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
         for t, trk in enumerate(trackers):
@@ -359,13 +360,19 @@ def get_frame(condition):
                 ymin = int(ymin * (row_h/img_h))
                 ymax = int(ymax * (row_h/img_h))
                 filepath = "userfiles/"+str(trk.id)+"/"+str(time.time())+".jpg"
+                if not os.path.isdir("userfiles/"):
+                    os.mkdir("userfiles/")
+                if not os.path.isdir("userfiles/"+str(trk.id)):
+                    os.mkdir("userfiles/"+str(trk.id))
                 cv2.imwrite(filepath,row_img[ymin:ymax,xmin:xmax])
                 inuser[str(trk.id)].find(filepath)
                 cv2.rectangle(row_img, (xmin, ymin), (xmax, ymax), (0, 0, 255), 2)
                 if str(trk.id) in inuser:
                     cv2.putText(row_img, "id: " + str(trk.id), (int(xmin) + 10, int(ymin) + 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-                    cv2.putText(row_img, "gender:"+inuser[str(trk.id)].gender, (int(xmin) + 10, int(ymin) + 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-                    cv2.putText(row_img, "age:"+str(int(inuser[str(trk.id)].age)), (int(xmin) + 10, int(ymin) + 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                    cv2.putText(row_img, "gender:"+inuser[str(trk.id)].gender, (int(xmin) + 10, int(ymin) + 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 255), 2)
+                    cv2.putText(row_img, "age:"+str(int(inuser[str(trk.id)].age)), (int(xmin) + 10, int(ymin) + 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
+                    cv2.putText(row_img, "double check:"+str(int(inuser[str(trk.id)].doublecheck)), (int(xmin) + 10, int(ymin) + 120), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+                    cv2.putText(row_img, "cont:"+str(int(inuser[str(trk.id)].getFileListcount())), (int(xmin) + 10, int(ymin) + 150), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2)
                 else:
                     cv2.putText(row_img, "id: " + str(trk.id), (int(xmin) - 10, int(ymin) - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
         #Total, IN, OUT count & Line
@@ -404,7 +411,9 @@ if __name__ == '__main__':
     checkPeople.start()
     model = 'ssd_mobilenet_v1_coco'
     cam = cv2.VideoCapture(0)
-    
+    # cam = cv2.VideoCapture("1.mp4")
+    # cam = cv2.VideoCapture("2.mp4")
+    # cam = cv2.VideoCapture("3.mp4")
     if not cam.isOpened():
         raise SystemExit('ERROR: failed to open camera!')
 
