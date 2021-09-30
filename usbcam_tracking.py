@@ -368,11 +368,11 @@ def get_frame(condition):
                 inuser[str(trk.id)].find(filepath)
                 cv2.rectangle(row_img, (xmin, ymin), (xmax, ymax), (0, 0, 255), 2)
                 if str(trk.id) in inuser:
-                    cv2.putText(row_img, "id: " + str(trk.id), (int(xmin) + 10, int(ymin) + 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-                    cv2.putText(row_img, "gender:"+inuser[str(trk.id)].gender, (int(xmin) + 10, int(ymin) + 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 255), 2)
-                    cv2.putText(row_img, "age:"+str(int(inuser[str(trk.id)].age)), (int(xmin) + 10, int(ymin) + 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
-                    cv2.putText(row_img, "double check:"+str(int(inuser[str(trk.id)].doublecheck)), (int(xmin) + 10, int(ymin) + 120), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-                    cv2.putText(row_img, "cont:"+str(int(inuser[str(trk.id)].getFileListcount())), (int(xmin) + 10, int(ymin) + 150), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2)
+                    cv2.putText(row_img, "id: " + str(trk.id), (int(xmin) + 10, int(ymax) - 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                    cv2.putText(row_img, "gender:"+inuser[str(trk.id)].gender, (int(xmin) + 10, int(ymax) - 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 255), 2)
+                    cv2.putText(row_img, "age:"+str(int(inuser[str(trk.id)].age)), (int(xmin) + 10, int(ymax) - 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
+                    cv2.putText(row_img, "double check:"+str(int(inuser[str(trk.id)].doublecheck)), (int(xmin) + 10, int(ymax) - 120), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+                    cv2.putText(row_img, "cont:"+str(int(inuser[str(trk.id)].getFileListcount())), (int(xmin) + 10, int(ymax) - 150), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2)
                 else:
                     cv2.putText(row_img, "id: " + str(trk.id), (int(xmin) - 10, int(ymin) - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
         #Total, IN, OUT count & Line

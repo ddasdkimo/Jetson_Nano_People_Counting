@@ -13,14 +13,23 @@ class UserData():
                 print("id:"+self.myUserData.userid)
                 try:
                     if self.myUserData.getFileListcount() >= 3:
-                        data = getAgeGender(self.myUserData.getFileList())
+                        filelist = self.myUserData.getFileList()
+                        data = getAgeGender(filelist)
                         genderlist = []
                         agelist = []
                         for agegenderdata in data:
                             for agegenderdataitem in agegenderdata:
+                                point = agegenderdataitem['point']
+                                if point['ymin'] == 0 and point['xmin'] == 0:
+                                    continue
                                 gender, age = agegenderdataitem["value"].split(",")
                                 genderlist.append(gender)
                                 agelist.append(float(age))
+                        if len(agelist) == 0:
+                            self.myUserData.removefilelist(filelist)
+                            print("id:"+self.myUserData.userid+"face no find")
+                            time.sleep(0.2)
+                            continue
                         agemean = statistics.mean(agelist)
                         gender = max(genderlist,key=genderlist.count)
                         self.myUserData.setGenderAge(gender,agemean)
@@ -126,7 +135,11 @@ class UserData():
     def setGenderAge(self,gender,age):
         self.gender = gender
         self.age = age
-
+    def removefilelist(self,filelist):
+        for item in filelist:
+            if item in self.filelist:
+                self.filelist.remove(item)
+                self.findcount -= 1
     def getDict(self):
         return {"id":str(self.jointime),"age":str(int(self.age)),"sex":str(self.gender),"staytime":str(self.ontime())}
         # return {"id":str(self.jointime),"age":str(int(self.age)),"sex":"Female","staytime":str(self.ontime())}
